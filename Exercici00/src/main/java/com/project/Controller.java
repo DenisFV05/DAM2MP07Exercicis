@@ -29,6 +29,18 @@ public class Controller {
     private double num1; // Primer numero en la operacion
     private String operador=""; 
 
+    @FXML
+    private void clearPantalla(ActionEvent event) {
+        pantalla.clear();
+        operador = "";
+        num1 = 0;
+    }
+
+    @FXML
+    private void insertarNumero(ActionEvent event) {
+        Button btn = (Button) event.getSource();
+        pantalla.appendText(btn.getText()); // Añade el número al TextField
+    }
 
     @FXML
     private void operar(ActionEvent event) {
