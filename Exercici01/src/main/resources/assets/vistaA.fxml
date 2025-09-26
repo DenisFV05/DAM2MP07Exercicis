@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox alignment="CENTER" spacing="15" xmlns:fx="http://javafx.com/fxml" fx:controller="com.project.ControllerVistaA">
+    <padding>
+        <Insets top="50" right="50" bottom="50" left="50"/>
+    </padding>
+
+    <Label text="Formulario de Usuario" style="-fx-font-size: 24px; -fx-font-weight: bold;"/>
+
+    <!-- Le limito el ancho -->
+    <VBox spacing="10" maxWidth="300">
+        <TextField fx:id="txtNom" promptText="Nombre" />
+        <TextField fx:id="txtEdat" promptText="Edad" />
+    </VBox>
+
+    <Button fx:id="btnEnviar" text="Enviar" onAction="#enviar" style="-fx-font-size: 14px; -fx-padding: 8 20 8 20;"/>
+</VBox>

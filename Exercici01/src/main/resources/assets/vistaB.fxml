@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox alignment="CENTER" spacing="20" xmlns:fx="http://javafx.com/fxml" fx:controller="com.project.ControllerVistaB">
+    <Label fx:id="lblSaludo" text=""/>
+    <Button fx:id="btnVolver" text="Volver" onAction="#volver"/>
+</VBox>
