@@ -1,0 +1,12 @@
+[
+  {"name": "Perro", "image": "perro.png", "color": "#A52A2A", "age": "5", "description": "El perro tiene un sentido del olfato 40 veces más desarrollado que el humano."},
+  {"name": "Gato", "image": "gato.png", "color": "#808080", "age": "3", "description": "Los gatos pueden girar sus orejas 180 grados."},
+  {"name": "Conejo", "image": "conejo.png", "color": "#FFFFFF", "age": "2", "description": "Los conejos pueden saltar hasta 1 metro de altura."},
+  {"name": "Hamster", "image": "hamster.png", "color": "#FFD700", "age": "1", "description": "Los hámsters tienen mejillas extensibles para guardar comida."},
+  {"name": "Cobaya", "image": "cobaya.png", "color": "#DAA520", "age": "4", "description": "Las cobayas emiten sonidos para comunicarse entre ellas."},
+  {"name": "Periquito", "image": "periquito.png", "color": "#00FF00", "age": "2", "description": "Los periquitos pueden imitar sonidos humanos."},
+  {"name": "Tortuga", "image": "tortuga.png", "color": "#228B22", "age": "10", "description": "Las tortugas pueden vivir más de 100 años."},
+  {"name": "Pato", "image": "pato.png", "color": "#FFFF00", "age": "3", "description": "Los patos tienen visión periférica casi completa."},
+  {"name": "Gallo", "image": "gallo.png", "color": "#FF4500", "age": "4", "description": "El canto del gallo puede escucharse a más de 1 km de distancia."},
+  {"name": "Caballo", "image": "caballo.png", "color": "#8B4513", "age": "7", "description": "Los caballos pueden dormir de pie gracias a su aparato de ligamentos."}
+]

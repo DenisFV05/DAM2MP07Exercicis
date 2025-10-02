@@ -1,0 +1,12 @@
+[
+  {"name": "León", "image": "leon.png", "color": "#FFD700", "age": "8", "description": "El rugido de un león se puede escuchar a 8 km de distancia."},
+  {"name": "Tigre", "image": "tigre.png", "color": "#FF8C00", "age": "6", "description": "Cada tigre tiene un patrón único de rayas, como las huellas dactilares humanas."},
+  {"name": "Elefante", "image": "elefante.png", "color": "#808080", "age": "12", "description": "Los elefantes pueden comunicarse a kilómetros mediante infrasonidos."},
+  {"name": "Jirafa", "image": "jirafa.png", "color": "#DAA520", "age": "7", "description": "El cuello de la jirafa tiene la misma cantidad de vértebras que un humano: 7."},
+  {"name": "Cebra", "image": "cebra.png", "color": "#FFFFFF", "age": "5", "description": "Las rayas de la cebra actúan como repelente de insectos."},
+  {"name": "Lobo", "image": "lobo.png", "color": "#A9A9A9", "age": "4", "description": "Los lobos tienen un sentido del olfato 100 veces más agudo que el humano."},
+  {"name": "Oso", "image": "oso.png", "color": "#8B4513", "age": "9", "description": "Los osos pueden correr hasta 50 km/h."},
+  {"name": "Cocodrilo", "image": "cocodrilo.png", "color": "#006400", "age": "11", "description": "Los cocodrilos pueden vivir más de 70 años."},
+  {"name": "Mono", "image": "mono.png", "color": "#8B0000", "age": "5", "description": "Los monos usan herramientas para obtener comida."},
+  {"name": "Rinoceronte", "image": "rinoceronte.png", "color": "#696969", "age": "10", "description": "El cuerno del rinoceronte está hecho de queratina, igual que el pelo y las uñas humanas."}
+]

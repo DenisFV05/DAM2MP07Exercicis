@@ -1,0 +1,12 @@
+[
+  {"name": "Delfín", "image": "delfin.png", "color": "#1E90FF", "age": "6", "description": "Los delfines pueden reconocerse en un espejo, mostrando autoconciencia."},
+  {"name": "Tiburón", "image": "tiburon.png", "color": "#4682B4", "age": "8", "description": "Los tiburones pueden detectar una gota de sangre en 25 litros de agua."},
+  {"name": "Ballena", "image": "ballena.png", "color": "#000080", "age": "15", "description": "Las ballenas azules son los animales más grandes que han existido."},
+  {"name": "Pulpo", "image": "pulpo.png", "color": "#800080", "age": "3", "description": "Los pulpos pueden cambiar de color y textura para camuflarse."},
+  {"name": "Medusa", "image": "medusa.png", "color": "#FF69B4", "age": "2", "description": "Algunas medusas son biológicamente inmortales."},
+  {"name": "Caballito de Mar", "image": "caballito.png", "color": "#FF6347", "age": "1", "description": "Los caballitos de mar machos son los que llevan y dan a luz a las crías."},
+  {"name": "Tortuga Marina", "image": "tortuga_marina.png", "color": "#2E8B57", "age": "12", "description": "Las tortugas marinas pueden migrar miles de kilómetros para desovar."},
+  {"name": "Pez Payaso", "image": "pez_payaso.png", "color": "#FFA500", "age": "2", "description": "Los peces payaso viven en simbiosis con las anémonas de mar."},
+  {"name": "Estrella de Mar", "image": "estrella.png", "color": "#FFD700", "age": "5", "description": "Las estrellas de mar pueden regenerar brazos perdidos."},
+  {"name": "Manta Raya", "image": "manta.png", "color": "#A9A9A9", "age": "7", "description": "Las mantas rayas pueden saltar fuera del agua para deshacerse de parásitos."}
+]
