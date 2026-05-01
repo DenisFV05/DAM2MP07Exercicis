@@ -5,7 +5,7 @@ import 'package:window_manager/window_manager.dart';
 import 'dart:io' show Platform;
 import 'ai_service.dart';
 import 'canvas_painter.dart';
-import 'widgets.dart'; // Si tuviera widgets comunes, pero usaré directos aquí
+// import 'widgets.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

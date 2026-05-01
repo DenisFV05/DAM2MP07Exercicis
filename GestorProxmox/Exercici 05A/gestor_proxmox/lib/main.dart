@@ -520,7 +520,7 @@ class _MainScreenState extends State<MainScreen> {
                                         onTap: () {
                                           setState(() => _selectedFile = file);
                                         },
-                                        onDoubleTap: () {
+                                        onLongPress: () {
                                           if (file.isDirectory) {
                                             _navigateToFolder(file.name);
                                           }

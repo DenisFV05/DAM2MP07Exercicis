@@ -62,7 +62,7 @@ class SSHService {
     if (_client == null) throw Exception('No conectado');
     
     final session = await _client!.execute(command);
-    final stdout = await session.stdout.transform(const Utf8Decoder()).join();
+    final stdout = await utf8.decodeStream(session.stdout);
     await session.done;
     return stdout;
   }
