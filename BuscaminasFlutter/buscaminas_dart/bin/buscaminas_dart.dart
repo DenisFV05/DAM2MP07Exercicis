@@ -78,7 +78,7 @@ class Buscaminas {
     String header = ' 0123456789';
     
     if (trampaActiva) {
-      print('$header      $header');
+      print('$header     $header');
     } else {
       print(header);
     }
