@@ -1,11 +1,20 @@
-enum ServerOption { local, remote }
+enum ServerOption { local, proxmox, custom }
 
 class NetworkConfig {
-  static const String remoteServer = 'apalaci8.ieti.site';
+  static const String proxmoxServer = 'ieticloudpro.ieti.cat';
+  static const int proxmoxPort = 3000;
 
   final ServerOption serverOption;
   final String playerName;
-  const NetworkConfig({required this.serverOption, required this.playerName});
+  final String customHost;
+  final int customPort;
+
+  const NetworkConfig({
+    required this.serverOption,
+    required this.playerName,
+    this.customHost = '127.0.0.1',
+    this.customPort = 3000,
+  });
 
   static const NetworkConfig defaults = NetworkConfig(
     serverOption: ServerOption.local,
@@ -16,8 +25,10 @@ class NetworkConfig {
     switch (serverOption) {
       case ServerOption.local:
         return '127.0.0.1';
-      case ServerOption.remote:
-        return remoteServer;
+      case ServerOption.proxmox:
+        return proxmoxServer;
+      case ServerOption.custom:
+        return customHost.isEmpty ? '127.0.0.1' : customHost;
     }
   }
 
@@ -25,8 +36,10 @@ class NetworkConfig {
     switch (serverOption) {
       case ServerOption.local:
         return 3000;
-      case ServerOption.remote:
-        return 443;
+      case ServerOption.proxmox:
+        return proxmoxPort;
+      case ServerOption.custom:
+        return customPort;
     }
   }
 
@@ -34,8 +47,10 @@ class NetworkConfig {
     switch (serverOption) {
       case ServerOption.local:
         return false;
-      case ServerOption.remote:
-        return true;
+      case ServerOption.proxmox:
+        return false; // Change to true if Proxmox has SSL
+      case ServerOption.custom:
+        return false;
     }
   }
 
@@ -43,15 +58,29 @@ class NetworkConfig {
     switch (serverOption) {
       case ServerOption.local:
         return 'Local (127.0.0.1:3000)';
-      case ServerOption.remote:
-        return 'Remote ($remoteServer:443)';
+      case ServerOption.proxmox:
+        return 'Proxmox ($proxmoxServer:$proxmoxPort)';
+      case ServerOption.custom:
+        return 'Custom ($serverHost:$serverPort)';
     }
   }
 
-  NetworkConfig copyWith({ServerOption? serverOption, String? playerName}) {
+  String get wsUrl {
+    final scheme = useSecureWebSocket ? 'wss' : 'ws';
+    return '$scheme://$serverHost:$serverPort';
+  }
+
+  NetworkConfig copyWith({
+    ServerOption? serverOption,
+    String? playerName,
+    String? customHost,
+    int? customPort,
+  }) {
     return NetworkConfig(
       serverOption: serverOption ?? this.serverOption,
       playerName: playerName ?? this.playerName,
+      customHost: customHost ?? this.customHost,
+      customPort: customPort ?? this.customPort,
     );
   }
 }
