@@ -178,63 +178,93 @@ class _CategoryCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 4,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
         child: Container(
-          height: 120,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            gradient: LinearGradient(
-              colors: [
-                _getContinentColor().withValues(alpha: 0.8),
-                _getContinentColor().withValues(alpha: 0.4),
-              ],
-            ),
-          ),
-          child: Row(
+          height: 140,
+          child: Stack(
             children: [
-              Container(
-                width: 100,
-                alignment: Alignment.center,
-                child: Icon(
-                  _getContinentIcon(),
-                  size: 50,
-                  color: Colors.white,
+              // Imagen de fondo del servidor
+              Positioned.fill(
+                child: Image.network(
+                  ApiService.getImageUrl(category.image),
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    // Gradiente de fallback si no hay imagen
+                    return Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            _getContinentColor().withValues(alpha: 0.8),
+                            _getContinentColor().withValues(alpha: 0.4),
+                          ],
+                        ),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          _getContinentIcon(),
+                          size: 60,
+                          color: Colors.white.withValues(alpha: 0.3),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        category.name,
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        category.description,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.white.withValues(alpha: 0.9),
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+              // Overlay para legibilidad
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.7),
+                        Colors.black.withValues(alpha: 0.1),
+                      ],
+                    ),
                   ),
                 ),
               ),
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Icon(Icons.arrow_forward_ios, color: Colors.white),
+              // Contenido
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            category.name,
+                            style: const TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            category.description,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.white.withValues(alpha: 0.9),
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 20),
+                  ],
+                ),
               ),
             ],
           ),
@@ -321,22 +351,37 @@ class _ItemCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      clipBehavior: Clip.antiAlias,
       child: ListTile(
-        contentPadding: const EdgeInsets.all(12),
+        contentPadding: const EdgeInsets.all(8),
         leading: ClipRRect(
           borderRadius: BorderRadius.circular(8),
           child: Container(
-            width: 60,
-            height: 60,
-            color: Colors.orange.shade100,
-            child: const Icon(Icons.restaurant, color: Colors.orange),
+            width: 70,
+            height: 70,
+            child: Image.network(
+              ApiService.getImageUrl(item.image),
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  color: Colors.orange.shade100,
+                  child: const Icon(Icons.restaurant, color: Colors.orange),
+                );
+              },
+            ),
           ),
         ),
         title: Text(
           item.name,
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
-        subtitle: Text('🌍 ${item.country}'),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text('🌍 ${item.country}'),
+          ],
+        ),
         trailing: const Icon(Icons.arrow_forward_ios, size: 16),
         onTap: onTap,
       ),
@@ -362,19 +407,27 @@ class DetailScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Imagen placeholder
+            // Imagen Real del servidor
             Container(
               width: double.infinity,
-              height: 200,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.orange.shade300, Colors.deepOrange.shade300],
-                ),
-              ),
-              child: const Icon(
-                Icons.restaurant_menu,
-                size: 80,
-                color: Colors.white,
+              height: 250,
+              child: Image.network(
+                ApiService.getImageUrl(item.image),
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.orange.shade300, Colors.deepOrange.shade300],
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.restaurant_menu,
+                      size: 80,
+                      color: Colors.white,
+                    ),
+                  );
+                },
               ),
             ),
             Padding(
