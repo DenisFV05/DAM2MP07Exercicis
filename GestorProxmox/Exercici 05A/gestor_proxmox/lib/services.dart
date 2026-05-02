@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:dartssh2/dartssh2.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:archive/archive_io.dart';
 import 'models.dart';
 
 class SSHService {
@@ -21,16 +23,39 @@ class SSHService {
         server.port,
         timeout: const Duration(seconds: 10),
       );
-      
+      List<SSHKeyPair>? identities;
+      if (server.privateKeyPath != null && server.privateKeyPath!.isNotEmpty) {
+        final pemFile = File(server.privateKeyPath!);
+        if (await pemFile.exists()) {
+          final pemContent = await pemFile.readAsString();
+          identities = SSHKeyPair.fromPem(pemContent);
+        } else {
+          throw Exception('Arxiu de clau privada no trobat: ${server.privateKeyPath}');
+        }
+      }
+
       _client = SSHClient(
         socket,
         username: server.username,
-        onPasswordRequest: () => server.password ?? '',
+        onPasswordRequest: (server.password != null && server.password!.isNotEmpty) 
+            ? () => server.password! 
+            : null,
+        identities: identities,
       );
       
+      await _client!.authenticated;
       _sftp = await _client!.sftp();
       _currentServer = server;
-      _currentPath = '/home/${server.username}';
+      
+      // Obtener el directorio inicial real del usuario remoto
+      try {
+        final session = await _client!.execute('pwd');
+        final pwdStr = await utf8.decodeStream(session.stdout);
+        _currentPath = pwdStr.trim();
+        if (_currentPath.isEmpty) _currentPath = '/';
+      } catch (e) {
+        _currentPath = '/home/${server.username}';
+      }
     } catch (e) {
       throw Exception('Error conectando: $e');
     }
@@ -48,7 +73,7 @@ class SSHService {
     if (_client == null) throw Exception('No conectado');
     
     final targetPath = path ?? _currentPath;
-    final result = await runCommand('ls -la "$targetPath"');
+    final result = await runCommand('LC_ALL=C ls -la "$targetPath"');
     
     final lines = result.split('\n')
         .where((l) => l.isNotEmpty && !l.startsWith('total'))
@@ -86,8 +111,9 @@ class SSHService {
     await runCommand('mkdir -p "$_currentPath/$name"');
   }
   
-  Future<void> deleteFile(String name) async {
-    await runCommand('rm -rf "$_currentPath/$name"');
+  Future<void> deleteFile(String filename) async {
+    if (_sftp == null) throw Exception('No conectado');
+    await runCommand('rm -rf "$_currentPath/$filename"');
   }
   
   Future<void> renameFile(String oldName, String newName) async {
@@ -112,6 +138,20 @@ class SSHService {
     await sink.close();
     await remoteFile.close();
   }
+
+  Future<void> downloadFolderAsZip(String remoteFolderName, String localPath) async {
+    final zipName = '${remoteFolderName}_download.zip';
+    // Comprimir en el servidor
+    await runCommand('cd "$_currentPath" && zip -r "$zipName" "$remoteFolderName"');
+    
+    try {
+      // Descargar el zip resultante
+      await downloadFile(zipName, localPath);
+    } finally {
+      // Eliminar el zip temporal del servidor
+      await runCommand('rm "$_currentPath/$zipName"');
+    }
+  }
   
   Future<void> uploadFile(String localPath, String remoteName) async {
     if (_sftp == null) throw Exception('SFTP no disponible');
@@ -127,7 +167,89 @@ class SSHService {
   }
   
   Future<void> extractZip(String zipName) async {
-    await runCommand('cd "$_currentPath" && unzip -o "$zipName"');
+    // Intentar unzip primero, luego python3 como fallback
+    final cmd = 'unzip -o "$zipName" 2>&1 || python3 -m zipfile -e "$zipName" . 2>&1';
+    final result = await runCommand('cd "$_currentPath" && $cmd');
+    
+    if (result.contains('not found') && result.contains('python3')) {
+      throw Exception('Cal instal·lar "unzip" al servidor.');
+    }
+  }
+  
+  Future<void> uploadFolderAsZip(String localFolderPath, String remoteName) async {
+    if (_sftp == null) throw Exception('No conectado');
+    final encoder = ZipFileEncoder();
+    final tempDir = await getTemporaryDirectory();
+    final zipPath = '${tempDir.path}/$remoteName.zip';
+    encoder.zipDirectory(Directory(localFolderPath), filename: zipPath);
+    
+    await uploadFile(zipPath, '$remoteName.zip');
+    
+    // Unzip y limpiar en remoto
+    await runCommand('cd "$_currentPath" && unzip -o "$remoteName.zip"');
+    await runCommand('rm "$_currentPath/$remoteName.zip"');
+    
+    // Limpiar local
+    File(zipPath).deleteSync();
+  }
+  
+  Future<DiskUsageNode> getDiskUsage(String path) async {
+    // Usamos --max-depth=1 para no saturar el comando
+    final result = await runCommand('du --max-depth=1 -k "$path"');
+    
+    final Map<String, int> sizes = {};
+    int rootSize = 0;
+    
+    for (final line in result.split('\n')) {
+      if (line.trim().isEmpty) continue;
+      final parts = line.trim().split(RegExp(r'\t|\s+'));
+      if (parts.length >= 2) {
+        final sizeKb = int.tryParse(parts[0]) ?? 0;
+        var folderPath = parts.sublist(1).join(' ').trim();
+        
+        // Normalizar rutas para comparar
+        final normPath = path.endsWith('/') ? path.substring(0, path.length - 1) : path;
+        var normFolder = folderPath.endsWith('/') ? folderPath.substring(0, folderPath.length - 1) : folderPath;
+        
+        // Si es ruta relativa al directorio actual
+        if (normFolder == '.' || normFolder == './' || normFolder == normPath) {
+          rootSize = sizeKb;
+        } else {
+          // Si la ruta es relativa (empieza por ./), convertirla a absoluta para el modelo
+          if (normFolder.startsWith('./')) {
+            folderPath = '$normPath/${normFolder.substring(2)}';
+          }
+          sizes[folderPath] = sizeKb;
+        }
+      }
+    }
+    
+    List<DiskUsageNode> children = [];
+    sizes.forEach((k, v) {
+      final name = k.replaceAll(RegExp(r'/+$'), '').split('/').last;
+      children.add(DiskUsageNode(
+        name: name.isEmpty ? k : name,
+        path: k,
+        size: v * 1024,
+        isDirectory: true,
+      ));
+    });
+    
+    // Si no se detectó el rootSize, sumar hijos
+    if (rootSize == 0 && children.isNotEmpty) {
+      rootSize = children.fold<int>(0, (sum, child) => sum + (child.size ~/ 1024).toInt());
+    }
+    if (rootSize == 0) rootSize = 1;
+
+    final rootName = path.replaceAll(RegExp(r'/+$'), '').split('/').last;
+    
+    return DiskUsageNode(
+      name: rootName.isEmpty ? '/' : rootName,
+      path: path,
+      size: rootSize * 1024,
+      isDirectory: true,
+      children: children,
+    );
   }
   
   Future<ServerStatus?> detectServer(String path) async {
@@ -184,35 +306,7 @@ class SSHService {
     );
   }
   
-  Future<DiskUsageNode> getDiskUsage(String path, {int depth = 2}) async {
-    final result = await runCommand('du -b --max-depth=$depth "$path" 2>/dev/null || du -sk "$path"');
-    final lines = result.split('\n').where((l) => l.isNotEmpty).toList();
-    
-    final nodes = <String, DiskUsageNode>{};
-    
-    for (final line in lines) {
-      final parts = line.split('\t');
-      if (parts.length >= 2) {
-        final size = int.tryParse(parts[0]) ?? 0;
-        final nodePath = parts[1];
-        final name = nodePath.split('/').last;
-        
-        nodes[nodePath] = DiskUsageNode(
-          name: name.isEmpty ? nodePath : name,
-          path: nodePath,
-          size: size,
-          isDirectory: true,
-        );
-      }
-    }
-    
-    return nodes[path] ?? DiskUsageNode(
-      name: path.split('/').last,
-      path: path,
-      size: 0,
-      isDirectory: true,
-    );
-  }
+
 }
 
 class ConfigService {

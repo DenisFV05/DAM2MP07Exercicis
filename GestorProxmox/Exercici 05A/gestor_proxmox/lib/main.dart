@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:file_picker/file_picker.dart';
 import 'models.dart';
 import 'services.dart';
 import 'widgets.dart';
@@ -226,14 +227,21 @@ class _MainScreenState extends State<MainScreen> {
   }
   
   Future<void> _downloadSelected() async {
-    if (_selectedFile == null || _selectedFile!.isDirectory) return;
+    if (_selectedFile == null) return;
     
     _setLoading(true, 'Descarregant...');
     try {
       final dir = await getDownloadsDirectory() ?? await getTemporaryDirectory();
-      final localPath = '${dir.path}/${_selectedFile!.name}';
-      await _ssh.downloadFile(_selectedFile!.name, localPath);
-      _setLoading(false, 'Descarregat a: $localPath');
+      
+      if (_selectedFile!.isDirectory) {
+        final localPath = '${dir.path}/${_selectedFile!.name}.zip';
+        await _ssh.downloadFolderAsZip(_selectedFile!.name, localPath);
+        _setLoading(false, 'Carpeta descarregada com a ZIP a: $localPath');
+      } else {
+        final localPath = '${dir.path}/${_selectedFile!.name}';
+        await _ssh.downloadFile(_selectedFile!.name, localPath);
+        _setLoading(false, 'Arxiu descarregat a: $localPath');
+      }
     } catch (e) {
       _setLoading(false, 'Error: $e');
     }
@@ -274,12 +282,101 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
   
+  Future<void> _uploadFile() async {
+    final result = await FilePicker.pickFiles();
+    if (result != null && result.files.single.path != null) {
+      final file = result.files.single;
+      _setLoading(true, 'Pujant ${file.name}...');
+      try {
+        await _ssh.uploadFile(file.path!, file.name);
+        await _refreshFiles();
+        _setLoading(false, 'Arxiu pujat');
+      } catch (e) {
+        _setLoading(false, 'Error pujant: $e');
+      }
+    }
+  }
+
+  Future<void> _uploadFolder() async {
+    final result = await FilePicker.getDirectoryPath();
+    if (result != null) {
+      final dirName = result.split(Platform.pathSeparator).last;
+      _setLoading(true, 'Comprimint i pujant carpeta $dirName...');
+      try {
+        await _ssh.uploadFolderAsZip(result, dirName);
+        await _refreshFiles();
+        _setLoading(false, 'Carpeta pujada i descomprimida');
+      } catch (e) {
+        _setLoading(false, 'Error pujant carpeta: $e');
+      }
+    }
+  }
+
+  Future<void> _extractSelected() async {
+    if (_selectedFile == null || !_selectedFile!.name.endsWith('.zip')) return;
+    
+    _setLoading(true, 'Descomprimint ${_selectedFile!.name}...');
+    try {
+      await _ssh.extractZip(_selectedFile!.name);
+      await _refreshFiles();
+      _setLoading(false, 'Arxiu descomprimit');
+    } catch (e) {
+      _setLoading(false, 'Error descomprimint: $e');
+    }
+  }
+  
+  Future<void> _showDiskUsage() async {
+    _setLoading(true, 'Analitzant disc (Baobab)...');
+    try {
+      final rootNode = await _ssh.getDiskUsage(_ssh.currentPath);
+      _setLoading(false);
+      
+      if (!mounted) return;
+      
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('Ús de Disc: ${_ssh.currentPath}'),
+          content: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              BaobabTreeWidget(rootNode: rootNode, size: 300),
+              const SizedBox(width: 24),
+              Expanded(
+                child: TitledListWidget(
+                  title: 'Carpetes',
+                  items: rootNode.children.map((c) => '${c.name} (${(c.size / 1024 / 1024).toStringAsFixed(1)} MB)').toList(),
+                  itemColors: List.generate(rootNode.children.length, (i) {
+                    final List<Color> colors = [
+                      Colors.blue, Colors.green, Colors.orange, Colors.purple,
+                      Colors.red, Colors.teal, Colors.amber, Colors.cyan
+                    ];
+                    return colors[(2 + i) % colors.length];
+                  }),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Tancar'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      _setLoading(false, 'Error analitzant disc: $e');
+    }
+  }
+  
   void _showAddServerDialog() {
     final nameCtrl = TextEditingController();
     final hostCtrl = TextEditingController();
     final portCtrl = TextEditingController(text: '22');
     final userCtrl = TextEditingController();
     final passCtrl = TextEditingController();
+    final keyCtrl = TextEditingController(text: r'C:\Users\Denis\.ssh\id_rsa');
     
     showDialog(
       context: context,
@@ -298,9 +395,14 @@ class _MainScreenState extends State<MainScreen> {
               LabeledTextField(label: 'Usuari', controller: userCtrl),
               const SizedBox(height: 12),
               LabeledTextField(
-                label: 'Contrasenya',
+                label: 'Contrasenya (Opcional)',
                 controller: passCtrl,
                 obscureText: true,
+              ),
+              const SizedBox(height: 12),
+              LabeledTextField(
+                label: 'Ruta Clau Privada (Opcional)',
+                controller: keyCtrl,
               ),
             ],
           ),
@@ -318,6 +420,7 @@ class _MainScreenState extends State<MainScreen> {
                 port: int.tryParse(portCtrl.text) ?? 22,
                 username: userCtrl.text,
                 password: passCtrl.text,
+                privateKeyPath: keyCtrl.text,
               );
               await _config.addServer(server);
               await _loadServers();
@@ -452,6 +555,21 @@ class _MainScreenState extends State<MainScreen> {
                           onPressed: _createFolder,
                           tooltip: 'Nova carpeta',
                         ),
+                        IconButton(
+                          icon: const Icon(Icons.upload_file),
+                          onPressed: _uploadFile,
+                          tooltip: 'Pujar arxiu',
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.drive_folder_upload),
+                          onPressed: _uploadFolder,
+                          tooltip: 'Pujar carpeta (Zip)',
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.pie_chart),
+                          onPressed: _showDiskUsage,
+                          tooltip: 'Ús de disc (Baobab)',
+                        ),
                       ],
                     ),
                   ),
@@ -518,7 +636,11 @@ class _MainScreenState extends State<MainScreen> {
                                           ),
                                         ),
                                         onTap: () {
-                                          setState(() => _selectedFile = file);
+                                          if (_selectedFile == file && file.isDirectory) {
+                                            _navigateToFolder(file.name);
+                                          } else {
+                                            setState(() => _selectedFile = file);
+                                          }
                                         },
                                         onLongPress: () {
                                           if (file.isDirectory) {
@@ -534,10 +656,11 @@ class _MainScreenState extends State<MainScreen> {
                                 Container(
                                   width: 280,
                                   color: Colors.grey.shade50,
-                                  padding: const EdgeInsets.all(16),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
+                                  child: SingleChildScrollView(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
                                       const Text(
                                         'ACCIONS',
                                         style: TextStyle(
@@ -551,6 +674,15 @@ class _MainScreenState extends State<MainScreen> {
                                         spacing: 8,
                                         runSpacing: 8,
                                         children: [
+                                          if (_selectedFile != null && _selectedFile!.isDirectory)
+                                            ElevatedButton.icon(
+                                              onPressed: () => _navigateToFolder(_selectedFile!.name),
+                                              icon: const Icon(Icons.folder_open, size: 16),
+                                              label: const Text('Obrir'),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: Colors.amber.shade100,
+                                              ),
+                                            ),
                                           ElevatedButton.icon(
                                             onPressed: _selectedFile != null
                                                 ? _showFileInfo
@@ -566,8 +698,7 @@ class _MainScreenState extends State<MainScreen> {
                                             label: const Text('Canviar nom'),
                                           ),
                                           ElevatedButton.icon(
-                                            onPressed: _selectedFile != null &&
-                                                    !_selectedFile!.isDirectory
+                                            onPressed: _selectedFile != null
                                                 ? _downloadSelected
                                                 : null,
                                             icon: const Icon(Icons.download, size: 16),
@@ -583,6 +714,15 @@ class _MainScreenState extends State<MainScreen> {
                                               backgroundColor: Colors.red.shade100,
                                             ),
                                           ),
+                                          if (_selectedFile != null && _selectedFile!.name.endsWith('.zip'))
+                                            ElevatedButton.icon(
+                                              onPressed: _extractSelected,
+                                              icon: const Icon(Icons.folder_zip, size: 16),
+                                              label: const Text('Descomprimir'),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: Colors.orange.shade100,
+                                              ),
+                                            ),
                                         ],
                                       ),
                                       
@@ -638,12 +778,14 @@ class _MainScreenState extends State<MainScreen> {
                                           });
                                         },
                                       ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
-                ),
+                          ),
+
                 
                 // Status bar
                 Container(
