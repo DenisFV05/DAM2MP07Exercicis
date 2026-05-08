@@ -6,7 +6,7 @@ import 'services.dart';
 
 class AIService {
   String baseUrl = 'http://localhost:11434/api/chat'; // Default Ollama port
-  String model = 'llama3.2'; // Default model
+  String model = 'qwen2.5-coder:7b'; // Default model
 
   final SSHService _ssh;
   final ConfigService _config;
