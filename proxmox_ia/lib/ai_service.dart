@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 import 'models.dart';
 import 'services.dart';
 
 class AIService {
-  String baseUrl = 'http://localhost:11414/api/chat'; // Default tunnel
+  String baseUrl = 'http://localhost:11434/api/chat'; // Default Ollama port
   String model = 'llama3.2'; // Default model
 
   final SSHService _ssh;
@@ -77,6 +78,33 @@ class AIService {
     {
       "type": "function",
       "function": {
+        "name": "extract_zip",
+        "description": "Extrae un archivo ZIP en el directorio actual",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string", "description": "Nombre del archivo ZIP"}
+          },
+          "required": ["name"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get_disk_usage",
+        "description": "Muestra el uso de disco del directorio actual o uno específico",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": {"type": "string", "description": "Ruta opcional"}
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
         "name": "list_servers",
         "description": "Lista los servidores configurados guardados",
         "parameters": {"type": "object", "properties": {}}
@@ -137,6 +165,78 @@ class AIService {
           "required": ["path"]
         }
       }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "restart_node_server",
+        "description": "Reinicia un servidor Node.js",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": {"type": "string", "description": "Ruta del proyecto Node.js"}
+          },
+          "required": ["path"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "download_file",
+        "description": "Descarga un archivo del servidor a la carpeta de Descargas del usuario",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string", "description": "Nombre del archivo o carpeta a descargar"}
+          },
+          "required": ["name"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "rename_file",
+        "description": "Cambia el nombre de un archivo o carpeta",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "old_name": {"type": "string", "description": "Nombre actual"},
+            "new_name": {"type": "string", "description": "Nuevo nombre"}
+          },
+          "required": ["old_name", "new_name"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "get_file_info",
+        "description": "Obtiene información detallada (stat) de un archivo",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": {"type": "string", "description": "Nombre del archivo"}
+          },
+          "required": ["name"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "setup_port_redirect",
+        "description": "Configura una redirección de puerto (requiere sudo)",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "from_port": {"type": "integer", "description": "Puerto origen (ej: 80)"},
+            "to_port": {"type": "integer", "description": "Puerto destino (ej: 3000)"}
+          },
+          "required": ["from_port", "to_port"]
+        }
+      }
     }
   ];
 
@@ -179,10 +279,7 @@ class AIService {
             
             print("Ejecutando tool: $name con args: $args");
             final result = await _executeTool(name, args);
-            //toolResults += "Tool $name executed. Result: $result\n";
-             // IMPORTANTE: En un flujo real de chat, deberíamos devolver el resultado a la IA 
-             // para que genere la respuesta final. Aquí simplificamos devolviendo el resultado directo.
-             toolResults += "$result\n";
+            toolResults += "$result\n";
           }
           return toolResults.isEmpty ? "Acción completada." : toolResults;
         }
@@ -215,6 +312,19 @@ class AIService {
         case 'delete_file':
           await _ssh.deleteFile(args['name']);
           return "Elemento '${args['name']}' eliminado.";
+
+        case 'extract_zip':
+          await _ssh.extractZip(args['name']);
+          return "Archivo '${args['name']}' extraído.";
+
+        case 'get_disk_usage':
+          final path = args['path'] ?? _ssh.currentPath;
+          final usage = await _ssh.getDiskUsage(path);
+          String res = "Uso de disco en ${usage.name}: ${usage.sizeFormatted}\n";
+          for (var child in usage.children) {
+            res += "  - ${child.name}: ${child.sizeFormatted}\n";
+          }
+          return res;
           
         case 'list_servers':
           final servers = await _config.loadServers();
@@ -229,7 +339,6 @@ class AIService {
               (s) => s.name.toLowerCase() == serverName.toLowerCase()
             );
             await onConnect(server);
-             // Esperamos un poco para asegurar la conexión antes de responder
             await Future.delayed(const Duration(seconds: 1));
             return "Conectado a ${server.name}. Ruta inicial: ${_ssh.currentPath}";
           } catch (e) {
@@ -248,6 +357,39 @@ class AIService {
         case 'stop_node_server':
           await _ssh.stopNodeServer(args['path']);
           return "Comando de parada enviado.";
+          
+        case 'restart_node_server':
+          await _ssh.restartNodeServer(args['path']);
+          return "Servidor reiniciado.";
+
+        case 'download_file':
+          final name = args['name'];
+          final dir = await getDownloadsDirectory() ?? await getTemporaryDirectory();
+          // Determinar si es carpeta o archivo (tendríamos que listarlo o usar stat)
+          // Simplificación: si no tiene extensión asumimos carpeta, o simplemente dejamos que el service decida
+          final files = await _ssh.listDirectory();
+          final isDir = files.any((f) => f.name == name && f.isDirectory);
+          
+          if (isDir) {
+            final localPath = '${dir.path}/${name}.zip';
+            await _ssh.downloadFolderAsZip(name, localPath);
+            return "Carpeta '$name' descargada como ZIP en: $localPath";
+          } else {
+            final localPath = '${dir.path}/$name';
+            await _ssh.downloadFile(name, localPath);
+            return "Archivo '$name' descargado en: $localPath";
+          }
+
+        case 'rename_file':
+          await _ssh.renameFile(args['old_name'], args['new_name']);
+          return "Renombrado de '${args['old_name']}' a '${args['new_name']}' completado.";
+
+        case 'get_file_info':
+          return await _ssh.getFileInfo(args['name']);
+
+        case 'setup_port_redirect':
+          await _ssh.setupPortRedirect(args['from_port'], args['to_port']);
+          return "Redirección de puerto ${args['from_port']} -> ${args['to_port']} configurada.";
           
         default:
           return "Función desconocida: $name";

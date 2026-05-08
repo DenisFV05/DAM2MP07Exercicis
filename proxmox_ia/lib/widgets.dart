@@ -8,6 +8,7 @@ import 'models.dart';
 class TitledListWidget extends StatelessWidget {
   final String title;
   final List<String> items;
+  final List<Color>? itemColors;
   final int? selectedIndex;
   final Function(int)? onItemTap;
 
@@ -15,6 +16,7 @@ class TitledListWidget extends StatelessWidget {
     super.key,
     required this.title,
     required this.items,
+    this.itemColors,
     this.selectedIndex,
     this.onItemTap,
   });
@@ -43,12 +45,28 @@ class TitledListWidget extends StatelessWidget {
                 color: isSelected ? Colors.blue.withValues(alpha: 0.1) : null,
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: Text(
-                entry.value,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isSelected ? Colors.blue : Colors.black54,
-                ),
+              child: Row(
+                children: [
+                  if (itemColors != null && itemColors!.length > entry.key)
+                    Container(
+                      width: 8,
+                      height: 8,
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        color: itemColors![entry.key],
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  Expanded(
+                    child: Text(
+                      entry.value,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isSelected ? Colors.blue : Colors.black54,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           );
@@ -340,7 +358,9 @@ class ServerStatusWidget extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 12),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
               if (!status.isRunning)
                 ElevatedButton.icon(
@@ -362,7 +382,6 @@ class ServerStatusWidget extends StatelessWidget {
                     foregroundColor: Colors.white,
                   ),
                 ),
-                const SizedBox(width: 8),
                 ElevatedButton.icon(
                   onPressed: onRestart,
                   icon: const Icon(Icons.refresh, size: 16),
@@ -421,16 +440,18 @@ class _BaobabPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final maxRadius = math.min(size.width, size.height) / 2 - 10;
+    final layerWidth = maxRadius / 3;
     
     _drawNode(
       canvas,
       rootNode,
       center,
-      maxRadius * 0.3,
-      maxRadius,
+      layerWidth * 0.5, // Radio interno del centro
+      layerWidth,       // Radio externo del primer nivel
       0,
       2 * math.pi,
       0,
+      0, // colorOffset inicial
     );
   }
 
@@ -443,9 +464,12 @@ class _BaobabPainter extends CustomPainter {
     double startAngle,
     double sweepAngle,
     int depth,
+    int colorOffset,
   ) {
+    if (sweepAngle < 0.001) return;
+
     final paint = Paint()
-      ..color = colors[depth % colors.length]
+      ..color = colors[(depth + colorOffset) % colors.length]
       ..style = PaintingStyle.fill;
 
     final path = Path()
@@ -473,12 +497,36 @@ class _BaobabPainter extends CustomPainter {
 
     canvas.drawPath(path, paint);
 
-    // Borde
+    // Borde más sutil para evitar líneas blancas gruesas
     final borderPaint = Paint()
-      ..color = Colors.white
+      ..color = Colors.white.withOpacity(0.5)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
+      ..strokeWidth = 0.5;
     canvas.drawPath(path, borderPaint);
+
+    // Dibujar hijos en el siguiente anillo
+    if (node.children.isNotEmpty && depth < 2) {
+      double currentAngle = startAngle;
+      final step = (outerRadius - innerRadius);
+      
+      for (int i = 0; i < node.children.length; i++) {
+        final child = node.children[i];
+        final childSweep = (child.size / node.size) * sweepAngle;
+        
+        _drawNode(
+          canvas,
+          child,
+          center,
+          outerRadius,
+          outerRadius + step,
+          currentAngle,
+          childSweep,
+          depth + 1,
+          colorOffset + i + 1, // Variar color por hermano
+        );
+        currentAngle += childSweep;
+      }
+    }
   }
 
   @override
